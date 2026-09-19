@@ -136,22 +136,6 @@ A good calibration target on 100 simulated matches at Speed x8:
 - Edit squads **before** pressing Start. Changes mid-match are ignored by design — they take effect on the next kick-off.
 - Press **New Team** on one side to regenerate just that squad; the other side is preserved for a rematch.
 
-### Roadmap (contributions welcome)
-
-The engine is intentionally lean in v1. Planned additions:
-
-- Assist chains, own goals, and per-match xG timeline
-- Cards, injuries, and fatigue (stamina drain per minute)
-- League / season mode with fixtures, tables and promotion / relegation
-- Post-match report export (JSON, PDF)
-- Automatic calibration tool: run N matches and suggest optimal constants
-- Additional formations (4-5-1, 3-4-3, 4-1-4-1, …)
-- Internationalisation (TR, ES, DE, FR, PT in addition to EN)
-- Light theme and customisable team colours
-- AI-vs-AI "auto league" viewer
-
-If any of these sound interesting, open an issue or a pull request — see **Contributing** below.
-
 ### License & contributing
 
 MIT — use it, fork it, embed it, ship it, modify it. Pull requests are welcome for any of the roadmap items above or for bug fixes. Please open an issue first for large redesigns so we can align on scope.
