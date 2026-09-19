@@ -2,8 +2,8 @@
 
 A self-contained HTML file that simulates full 90-minute football matches on a 9-zone tactical pitch. No server, no dependencies, no installation — open it in any modern browser and play. Teams are generated with realistic identities (attack-minded, defence-minded, or balanced), matches unfold through a dice-driven zone engine, and every tunable constant is exposed in a live editor.
 
-**Live demo:** [your GitHub Pages URL]
-**Source:** [your GitHub repo URL]
+**Live demo:** https://umithy.github.io/footballsimulation/
+**Source:** https://github.com/umithy/footballsimulation
 
 ### Overview
 
