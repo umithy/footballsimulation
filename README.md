@@ -139,3 +139,6 @@ A good calibration target on 100 simulated matches at Speed x8:
 ### License & contributing
 
 MIT — use it, fork it, embed it, ship it, modify it. Pull requests are welcome for any of the roadmap items above or for bug fixes. Please open an issue first for large redesigns so we can align on scope.
+
+<img width="2537" height="1264" alt="image" src="https://github.com/user-attachments/assets/f27b1179-bf30-468b-b16b-8d3246151001" />
+<img width="2556" height="1249" alt="image" src="https://github.com/user-attachments/assets/697e02c5-29b3-4627-8f0c-49ceb66a30f9" />
