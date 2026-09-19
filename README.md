@@ -1,3 +1,5 @@
+<img width="2537" height="1264" alt="image" src="https://github.com/user-attachments/assets/f27b1179-bf30-468b-b16b-8d3246151001" />
+
 ## Football Simulator — a single-file tactical match simulator
 
 A self-contained HTML file that simulates full 90-minute football matches on a 9-zone tactical pitch. No server, no dependencies, no installation — open it in any modern browser and play. Teams are generated with realistic identities (attack-minded, defence-minded, or balanced), matches unfold through a dice-driven zone engine, and every tunable constant is exposed in a live editor.
@@ -140,5 +142,4 @@ A good calibration target on 100 simulated matches at Speed x8:
 
 MIT — use it, fork it, embed it, ship it, modify it. Pull requests are welcome for any of the roadmap items above or for bug fixes. Please open an issue first for large redesigns so we can align on scope.
 
-<img width="2537" height="1264" alt="image" src="https://github.com/user-attachments/assets/f27b1179-bf30-468b-b16b-8d3246151001" />
 <img width="2556" height="1249" alt="image" src="https://github.com/user-attachments/assets/697e02c5-29b3-4627-8f0c-49ceb66a30f9" />
