@@ -26,7 +26,8 @@ A 90 + 3–8 minute match at default settings typically produces **2.5–3.5 tot
 - **Hide-field mode** — toggle the pitch off to focus on statistics without stopping the match.
 - **Speed control** — x1 (4 s/min), x2 (2 s/min), x4 (1 s/min), x8 (0.5 s/min).
 - **Editable squads** — change any of the 6 outfield attributes (pace, shooting, passing, dribbling, defending, physic) before the next match.
-- **Five formations** — 4-4-2, 4-3-3, 4-2-3-1, 5-3-2, 3-5-2, 3-4-2-1, with automatic positional labels (LCB/CB/RCB, LCM/CM/RCM, LOM/CF/ROM, etc.).
+- **Sixteen formations** — 4-4-2, 4-3-3, 4-2-3-1, 3-5-2, 5-3-2, 3-4-2-1, 3-4-3, 4-1-4-1, 4-4-1-1, 4-1-2-1-2 (diamond), 4-1-2-2-1, 4-3-2-1, 5-4-1, 4-5-1, 3-4-1-2 and 4-1-3-2, with automatic positional labels (LCB/CB/RCB, LCM/CM/RCM, LIF/RIF, etc.).
+- **25 role-based position profiles (+GK)** — every slot carries a role code with its own attribute profile: ST, CF, LF, RF, OM, LW/RW, CAM, LAM/RAM, LM/RM, CM, DM, LB/RB, LWB/RWB, CB, TM (target man), B2B (box-to-box), DLP (deep-lying playmaker), SS (shadow striker), IF (inside forward) and IWB (inside wing-back). A target man and a shadow striker play differently even when they occupy the same square.
 - **Home-advantage toggle** — a flat per-roll bonus for the home side, switchable before kick-off.
 - **24 tunable constants** in an Advanced panel — every threshold, weight and cap is adjustable and committed on match start.
 - **Reset-defaults button** — one click returns all constants to factory values.
