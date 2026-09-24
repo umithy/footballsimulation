@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Football Match Simulation v1</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --border:#2a3140; --text:#e6e6e6; --muted:#9aa4b2;
+    --home:#e5484d; --away:#3b82f6; --accent:#3fb950;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--text); font-family:system-ui,Segoe UI,Roboto,sans-serif; padding:12px;}
+  .mono{font-family:ui-monospace,Consolas,monospace;}
+  /* ---------- scoreboard ---------- */
+  #scorebar{display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px 16px;}
+  #scorebar .team{font-size:18px; font-weight:700; flex:1;}
+  #scorebar .team.right{text-align:right;}
+  #scorebar .score{font-size:26px; font-weight:800; font-family:ui-monospace,Consolas,monospace;}
+  #scorebar .clock{ text-align:center; min-width:110px;}
+  #scorebar .clock .min{font-size:20px; font-weight:800; font-family:ui-monospace,Consolas,monospace; color:var(--accent);}
+  #scorebar .clock .half{font-size:11px; color:var(--muted);}
+  #scorebar.pulse{animation:pulse .8s ease;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.7);}100%{box-shadow:0 0 0 22px rgba(63,185,80,0);}}
+  /* ---------- controls ---------- */
+  #controls{display:flex; gap:8px; flex-wrap:wrap; margin:10px 0;}
+  button{background:#212836; color:var(--text); border:1px solid var(--border); border-radius:8px;
+    padding:7px 14px; font-size:13px; cursor:pointer;}
+  button:hover{background:#2a3342;}
+  button.active{background:var(--accent); color:#08130b; border-color:var(--accent); font-weight:700;}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+  /* ---------- layout ---------- */
+  #main{display:grid; grid-template-columns:320px 1fr 320px; gap:12px; align-items:start;}
+  @media (max-width:1100px){ #main{grid-template-columns:1fr;} }
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px;}
+  .panel h3{font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:8px;}
+  .rowline{display:flex; gap:6px; align-items:center; margin-bottom:8px; flex-wrap:wrap;}
+  input[type=text]{background:#0d1117; border:1px solid var(--border); color:var(--text); border-radius:6px;
+    padding:6px 8px; font-size:13px; width:130px;}
+  select{background:#0d1117; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px; font-size:13px;}
+  table.pt{width:100%; border-collapse:collapse; font-family:ui-monospace,Consolas,monospace; font-size:14px;}
+  table.pt th{color:var(--muted); font-weight:600; padding:4px 0; text-align:center; font-size:11px;}
+  table.pt td{padding:3px 1px; text-align:center;}
+  table.pt input[type=number]{width:34px; background:#0d1117; border:1px solid var(--border); color:var(--text);
+    border-radius:4px; padding:8px 1px; text-align:center; font-size:18px;}
+  input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+  input[type=number]{-moz-appearance:textfield; appearance:textfield;}
+  .poscell{font-weight:700; color:var(--text); font-size:13px;}
+  .infoline{margin-top:8px; font-size:16px; color:var(--muted); font-family:ui-monospace,Consolas,monospace; line-height:1.5;}
+  /* ---------- pitch ---------- */
+  #pitchwrap{position:relative;}
+  #pitchwrap.hidden{display:none;}
+  #pitch{position:relative; width:100%; aspect-ratio:16/10; border-radius:10px; overflow:hidden;
+    background:linear-gradient(90deg,#1d6b3a,#17552f); border:1px solid var(--border);
+    display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr);}
+  .cell{position:relative; border:1px solid rgba(255,255,255,.14); display:flex; flex-direction:row;
+    justify-content:space-between; align-items:stretch; padding:4px;}
+  .cell.active{outline:2px solid rgba(255,255,255,.75); outline-offset:-2px;}
+  .cell.flash{animation:cellflash .7s ease;}
+  @keyframes cellflash{0%{background:rgba(255,255,90,.45);}100%{background:transparent;}}
+  .zlabel{position:absolute; top:2px; right:4px; font-size:10px; color:rgba(255,255,255,.55); font-family:ui-monospace,monospace;}
+  #pitch.hidezl .zlabel{display:none;}
+  .sqrow{flex:1; display:flex; flex-direction:column; gap:5px; justify-content:center; align-items:center;}
+  .sq{width:52px; height:40px; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800;
+    font-family:ui-monospace,monospace; color:#fff; border-radius:6px; border:1px solid rgba(0,0,0,.5);}
+  .sq.home{background:var(--home);}
+  .sq.away{background:var(--away);}
+  /* goalkeepers pinned to their own goal line, outside zone cells */
+  .sq.gk{position:absolute; top:50%; transform:translateY(-50%); z-index:4;}
+  .sq.gk.home{left:4px;}
+  .sq.gk.away{right:4px;}
+  .goaldec{position:absolute; top:50%; width:6px; height:16%; transform:translateY(-50%); background:rgba(255,255,255,.65); border-radius:2px;}
+  #ball{position:absolute; width:12px; height:12px; margin:-6px 0 0 -6px; border-radius:50%;
+    background:#ffd83d; border:2px solid #111; transition:left .3s linear, top .3s linear; z-index:5; pointer-events:none;}
+  #viewopts{display:flex; gap:12px; align-items:center; margin:8px 2px; font-size:12px; color:var(--muted); flex-wrap:wrap;}
+  #viewopts label{display:flex; gap:4px; align-items:center; cursor:pointer;}
+  /* ---------- log ---------- */
+  #log{background:#0d1117; border:1px solid var(--border); border-radius:8px; margin-top:10px;
+    height:260px; overflow-y:auto; padding:8px; font-family:ui-monospace,Consolas,monospace; font-size:20px; line-height:1.65;}
+  #log .line{border-left:3px solid #555; padding-left:8px; margin-bottom:3px; color:var(--text);}
+  #log .min{color:var(--accent); font-weight:700; margin-right:6px;}
+  #log .type-goal{border-color:var(--accent); color:#c9f7cf; font-weight:700;}
+  #log .type-shot{border-color:#58a6ff;}
+  #log .type-corner{border-color:#f0883e;}
+  #log .type-penalty{border-color:#d2a8ff; font-weight:700;}
+  #log .type-foul{border-color:#e3b341;}
+  #log .type-counter{border-color:#bc8cff;}
+  #log.compact .line:not(.key){display:none;}
+  /* ---------- stats ---------- */
+  #statsbox{margin-top:10px;}
+  table.st{width:100%; border-collapse:collapse; font-family:ui-monospace,Consolas,monospace; font-size:18px;}
+  table.st td{padding:3px 6px; border-bottom:1px solid var(--border);}
+  table.st td.v{text-align:center; width:52px; font-weight:700;}
+  table.st td.l{text-align:center; color:var(--muted);}
+  #heatbox{display:none; gap:28px; justify-content:center; margin-top:14px;}
+  #heatbox.show{display:flex;}
+  .heat{font-family:ui-monospace,monospace; font-size:20px; text-align:center; color:#ffffff; font-weight:700;}
+  .heat table{border-collapse:collapse; margin-top:6px;}
+  .heat td{border:1px solid rgba(255,255,255,.8); width:68px; height:44px; text-align:center;
+    color:#000000; font-weight:800; font-size:20px;}
+  /* ---------- advanced ---------- */
+  #adv{margin-top:14px;}
+  #adv details{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px;}
+  #adv summary{cursor:pointer; font-size:20px; color:var(--muted); font-weight:700; letter-spacing:.05em;}
+  #advgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:8px; margin-top:10px;}
+  #advgrid label{font-size:16px; color:var(--muted); display:flex; flex-direction:column; gap:3px;}
+  #advgrid input{background:#0d1117; border:1px solid var(--border); color:var(--text); border-radius:5px; padding:4px 6px; font-size:18px;}
+</style>
+</head>
+<body>
+
+<div id="scorebar">
+  <div class="team" id="sbHome">Home Team</div>
+  <div class="score"><span id="scHome">0</span> - <span id="scAway">0</span></div>
+  <div class="clock"><div class="min" id="clockMin">MIN 1</div><div class="half" id="clockHalf">first half</div></div>
+  <div class="score" style="visibility:hidden">0-0</div>
+  <div class="team right" id="sbAway">Away Team</div>
+</div>
+
+<div id="controls">
+  <button id="btnStart">Start</button>
+  <button id="btnPause">Pause</button>
+  <button id="btnS1" class="active">Speed x1</button>
+  <button id="btnS2">Speed x2</button>
+  <button id="btnS4">Speed x4</button>
+  <button id="btnS8">Speed x8</button>
+  <button id="btnCancel">Cancel</button>
+</div>
+
+<div id="main">
+  <div class="panel" id="panelHome"></div>
+  <div>
+    <div id="viewopts">
+      <label><input type="checkbox" id="optZL" checked> Zone labels</label>
+      <label><input type="checkbox" id="optCompact"> Compact log</label>
+      <label><input type="checkbox" id="optHeat"> Zone heat map</label>
+      <label><input type="checkbox" id="optHide"> Hide field</label>
+      <label><input type="checkbox" id="optHomeAdv" checked> Home Team advantage</label>
+    </div>
+    <div id="pitchwrap">
+      <div id="pitch"></div>
+      <div id="ball"></div>
+    </div>
+    <div id="log"></div>
+    <div id="statsbox"><table class="st" id="stTable"></table></div>
+    <div id="heatbox"></div>
+  </div>
+  <div class="panel" id="panelAway"></div>
+</div>
+
+<div id="adv">
+  <details>
+    <summary>ADVANCED CALCULATION CONSTANTS</summary>
+    <div id="advgrid"></div>
+    <div style="margin-top:10px"><button id="btnCfgReset">Reset defaults</button></div>
+  </details>
+</div>
+
+<script>
+/* ============================================================
+   FOOTBALL MATCH SIMULATION v1  (single file, no dependencies)
+   v2 candidates (not implemented): assists, offside, cards,
+   injuries, fatigue, home advantage, half swap, throw-ins,
+   pass stats, player movement, player names.
+============================================================ */
+
+/* ---------------- utils ---------------- */
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ri=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
+const flipL=l=>l==='L'?'R':l==='R'?'L':'C';
+
+/* ---------------- config ---------------- */
+const DEFAULT_CFG={
+  dice:25,
+  breakThr:10, sideThr:5, foulThr:2, outFloor:-2, turnoverFloor:-10, counterThr:-13,
+  shotOnMin:-6, shotOnMax:-3, shotOffMin:-10, shotOffMax:-7,
+  gkBoxWeight:0.35, gkCornerWeight:0.30,
+  bonusPerPlayer:5, bonusCap:15, supportBonus:3,
+  penGoalThr:10, cornerGoalThr:14,
+  boxFoulPenChance:0.40, emptyZonePenalty:6,
+  gapScale:0.60, gapCap:3,
+  homeAdvantage:3
+};
+let CFG=Object.assign({},DEFAULT_CFG);          /* active config used by the engine */
+let pendingCfg=Object.assign({},DEFAULT_CFG);   /* panel edits; committed only at initMatch */
+let homeAdvOn=true;        /* committed home-advantage state for the running match */
+let pendingHomeAdv=true;   /* checkbox state; committed only at next initMatch */
+
+const ADV_FIELDS=[
+  ['dice','Dice sides (d4-d100)',4,100],
+  ['breakThr','Break threshold (+)',1,30],
+  ['sideThr','Side-switch threshold (+)',1,30],
+  ['foulThr','Foul threshold (+)',1,30],
+  ['outFloor','Out-of-play floor (-)',-30,0],
+  ['turnoverFloor','Turnover floor (-)',-30,0],
+  ['counterThr','Counter threshold (-)',-30,-1],
+  ['shotOnMin','Shot ON band min (-)',-30,0],
+  ['shotOnMax','Shot ON band max (-)',-30,0],
+  ['shotOffMin','Shot OFF band min (-)',-30,0],
+  ['shotOffMax','Shot OFF band max (-)',-30,0],
+  ['gkBoxWeight','GK box weight (0-1)',0,1],
+  ['gkCornerWeight','GK corner weight (0-1)',0,1],
+  ['bonusPerPlayer','Bonus per extra own player',0,10],
+  ['bonusCap','Total bonus cap',0,30],
+  ['supportBonus','Bonus per support-square player',0,10],
+  ['penGoalThr','Penalty goal threshold (+)',1,30],
+  ['cornerGoalThr','Corner goal threshold (+)',1,30],
+  ['boxFoulPenChance','Box foul -> penalty chance',0,1],
+  ['emptyZonePenalty','Support/empty-zone penalty',0,30],
+  ['gapScale','Gap scale (0-1)',0,1],
+  ['gapCap','Gap cap (points)',0,15],
+  ['homeAdvantage','Home advantage (+)',0,15]
+];
+/* ---------------- formations (own perspective: basePos, depth, lateral) ---------------- */
+const FORMATIONS={
+ /* 4-4-2: flat four midfield = LM/RM wide + two CM; strike pair = target man + link forward */
+ '4-4-2':[['GK',1,'C'],['LB',1,'L'],['CB',1,'C'],['CB',1,'C'],['RB',1,'R'],['LM',2,'L'],['CM',2,'C'],['CM',2,'C'],['RM',2,'R'],['TM',3,'C'],['CF',3,'C']],
+ /* 4-3-3: mid three are CENTRAL (LCM/B2B/RCM); wingers are the sole width -> LW/RW */
+ '4-3-3':[['GK',1,'C'],['LB',1,'L'],['CB',1,'C'],['CB',1,'C'],['RB',1,'R'],['CM',2,'L'],['B2B',2,'C'],['CM',2,'R'],['LW',3,'L'],['ST',3,'C'],['RW',3,'R']],
+ /* 4-2-3-1: double pivot (DLP+DM); the '3' sits HIGH: inside forwards wide + OM central */
+ '4-2-3-1':[['GK',1,'C'],['LB',1,'L'],['CB',1,'C'],['CB',1,'C'],['RB',1,'R'],['DLP',2,'C'],['DM',2,'C'],['IF',3,'L'],['OM',3,'C'],['IF',3,'R'],['ST',3,'C']],
+ /* 3-5-2: wing-backs provide width from mid five; three central CM; ST+CF pair */
+ '3-5-2':[['GK',1,'C'],['CB',1,'L'],['CB',1,'C'],['CB',1,'R'],['LWB',2,'L'],['CM',2,'C'],['CM',2,'C'],['CM',2,'C'],['RWB',2,'R'],['ST',3,'C'],['CF',3,'C']],
+ /* 5-3-2: back five (WBs deep); mid three are CENTRAL (no wide mid = real weakness); ST+CF */
+ '5-3-2':[['GK',1,'C'],['LWB',1,'L'],['CB',1,'C'],['CB',1,'C'],['CB',1,'C'],['RWB',1,'R'],['CM',2,'C'],['CM',2,'C'],['CM',2,'C'],['ST',3,'C'],['CF',3,'C']],
+ /* 3-4-2-1: WB wide, two inside playmakers (OM) behind a lone ST */
+ '3-4-2-1':[['GK',1,'C'],['CB',1,'L'],['CB',1,'C'],['CB',1,'R'],['LWB',2,'L'],['CM',2,'C'],['CM',2,'C'],['RWB',2,'R'],['OM',3,'L'],['ST',3,'C'],['OM',3,'R']],
+ /* 3-4-3 CLASSIC: wing-backs give width -> front three narrow (LF/ST/RF).
+    Alternative variant: swap LWB/RWB->IWB and LF/RF->LW/RW (inside WBs + wide wingers). */
+ '3-4-3':[['GK',1,'C'],['CB',1,'L'],['CB',1,'C'],['CB',1,'R'],['LWB',2,'L'],['CM',2,'C'],['CM',2,'C'],['RWB',2,'R'],['LF',3,'L'],['ST',3,'C'],['RF',3,'R']],
+ /* 4-1-4-1: DM behind a flat four mid (LM/LCM/RCM/RM); lone ST */
+ '4-1-4-1':[['GK',1,'C'],['LB',1,'L'],['CB',1,'C'],['CB',1,'C'],['RB',1,'R'],['LM',2,'L'],['DM',2,'C'],['CM',2,'C'],['CM',2,'C'],['RM',2,'R'],['ST',3,'C']],
+ /* 4-4-1-1: flat four mid; shadow striker behind the striker */
+ '4-4-1-1':[['GK',1,'C'],['LB',1,'L'],['CB',1,'C'],['CB',1,'C'],['RB',1,'R'],['LM',2,'L'],['CM',2,'C'],['CM',2,'C'],['RM',2,'R'],['SS',3,'C'],['ST',3,'C']],
+ /* 4-1-2-1-2 (diamond): DM base, two shuttle CM wide, OM tip, ST+CF pair */
+ '4-1-2-1-2':[['GK',1,'C'],['LB',1,'L'],['CB',1,'C'],['CB',1,'C'],['RB',1,'R'],['DM',2,'C'],['CM',2,'L'],['CM',2,'R'],['ST',3,'C'],['OM',3,'C'],['CF',3,'C']],
+ /* 4-1-2-2-1: DM + two CM; two wide forwards + lone ST */
+ '4-1-2-2-1':[['GK',1,'C'],['LB',1,'L'],['CB',1,'C'],['CB',1,'C'],['RB',1,'R'],['DM',2,'C'],['CM',2,'L'],['CM',2,'R'],['LW',3,'L'],['ST',3,'C'],['RW',3,'R']],
+ /* 4-3-2-1 (tree): three CM; two central OM behind ST */
+ '4-3-2-1':[['GK',1,'C'],['LB',1,'L'],['CB',1,'C'],['CB',1,'C'],['RB',1,'R'],['CM',2,'L'],['CM',2,'C'],['CM',2,'R'],['OM',3,'C'],['ST',3,'C'],['OM',3,'C']],
+ /* 5-4-1: back five; flat four mid; lone ST */
+ '5-4-1':[['GK',1,'C'],['LWB',1,'L'],['CB',1,'C'],['CB',1,'C'],['CB',1,'C'],['RWB',1,'R'],['LM',2,'L'],['CM',2,'C'],['CM',2,'C'],['RM',2,'R'],['ST',3,'C']],
+ /* 4-5-1: flat four mid + extra CM; lone ST */
+ '4-5-1':[['GK',1,'C'],['LB',1,'L'],['CB',1,'C'],['CB',1,'C'],['RB',1,'R'],['LM',2,'L'],['CM',2,'C'],['CM',2,'C'],['CM',2,'C'],['RM',2,'R'],['ST',3,'C']],
+ /* 3-4-1-2: WB wide; OM behind ST+CF */
+ '3-4-1-2':[['GK',1,'C'],['CB',1,'L'],['CB',1,'C'],['CB',1,'R'],['LWB',2,'L'],['CM',2,'C'],['CM',2,'C'],['RWB',2,'R'],['ST',3,'C'],['OM',3,'C'],['CF',3,'C']],
+ /* 4-1-3-2: DM + three mid (LM/CM/RM); ST+CF pair */
+ '4-1-3-2':[['GK',1,'C'],['LB',1,'L'],['CB',1,'C'],['CB',1,'C'],['RB',1,'R'],['DM',2,'C'],['LM',2,'L'],['CM',2,'C'],['RM',2,'R'],['ST',3,'C'],['CF',3,'C']]
+};
+function labelsFor(form){
+  const slots=FORMATIONS[form], count={};
+  slots.forEach(s=>{ if(s[0]!=='GK') count[s[0]]=(count[s[0]]||0)+1; });
+  const used={};
+  return slots.map(s=>{
+    const b=s[0];
+    if(b==='GK') return 'GK';
+    const n=count[b]; used[b]=(used[b]||0)+1;
+    if(n===1) return b;
+    if(n===2) return (used[b]===1?'L':'R')+b;
+    return (used[b]===1?'L':used[b]===2?'':'R')+b;
+  });
+}
+
+/* ---------------- attribute blends ---------------- */
+const ATT_W={1:{pace:.10,shooting:.05,passing:.45,dribbling:.20,physic:.20},
+             2:{pace:.20,shooting:.05,passing:.35,dribbling:.30,physic:.10},
+             3:{pace:.20,shooting:.45,passing:.05,dribbling:.20,physic:.10}};
+const DEF_W={1:{defending:.55,physic:.25,pace:.15,passing:.05},
+             2:{defending:.50,physic:.25,pace:.20,passing:.05},
+             3:{defending:.40,physic:.20,pace:.30,passing:.10}};
+const CORNER_ATT_W={physic:.45,shooting:.35,passing:.20};
+const CORNER_DEF_W={defending:.50,physic:.40,pace:.10};
+const SUPPORT={
+  '1L':['1C'],       '1C':['1L','1R'],  '1R':['1C'],
+  '2L':['2C'],       '2C':['2L','2R'],  '2R':['2C'],
+  '3L':['3C'],       '3C':['3L','3R'],  '3R':['3C']
+};
+const POS_MODS={
+  ST:{pace:0,shooting:10,passing:-4,dribbling:5,defending:-22,physic:2},
+  CF:{pace:1,shooting:9,passing:2,dribbling:6,defending:-20,physic:1},
+  LF:{pace:5,shooting:7,passing:1,dribbling:7,defending:-18,physic:0},
+  RF:{pace:5,shooting:7,passing:1,dribbling:7,defending:-18,physic:0},
+  OM:{pace:2,shooting:6,passing:9,dribbling:7,defending:-16,physic:-2},
+  LW:{pace:8,shooting:3,passing:4,dribbling:9,defending:-17,physic:-2},
+  RW:{pace:8,shooting:3,passing:4,dribbling:9,defending:-17,physic:-2},
+  CAM:{pace:2,shooting:5,passing:8,dribbling:6,defending:-14,physic:-2},
+  LAM:{pace:4,shooting:3,passing:7,dribbling:8,defending:-14,physic:-2},
+  RAM:{pace:4,shooting:3,passing:7,dribbling:8,defending:-14,physic:-2},
+  LM:{pace:6,shooting:2,passing:4,dribbling:6,defending:-12,physic:-2},
+  RM:{pace:6,shooting:2,passing:4,dribbling:6,defending:-12,physic:-2},
+  CM:{pace:0,shooting:-2,passing:8,dribbling:2,defending:4,physic:2},
+  DM:{pace:-2,shooting:-8,passing:4,dribbling:0,defending:10,physic:6},
+  LB:{pace:6,shooting:-12,passing:2,dribbling:0,defending:8,physic:0},
+  RB:{pace:6,shooting:-12,passing:2,dribbling:0,defending:8,physic:0},
+  LWB:{pace:7,shooting:-10,passing:3,dribbling:2,defending:6,physic:2},
+  RWB:{pace:7,shooting:-10,passing:3,dribbling:2,defending:6,physic:2},
+  CB:{pace:-2,shooting:-16,passing:-4,dribbling:-4,defending:12,physic:8},
+  TM:{pace:-4,shooting:7,passing:2,dribbling:-2,defending:-18,physic:10},
+  B2B:{pace:3,shooting:2,passing:5,dribbling:3,defending:6,physic:5},
+  DLP:{pace:-1,shooting:-4,passing:11,dribbling:3,defending:5,physic:0},
+  SS:{pace:3,shooting:7,passing:5,dribbling:7,defending:-14,physic:-1},
+  IF:{pace:7,shooting:6,passing:2,dribbling:8,defending:-16,physic:-2},
+  IWB:{pace:5,shooting:-8,passing:6,dribbling:3,defending:7,physic:2}
+};
+
+/* ---------------- team generation ---------------- */
+function makeRandomTeam(){
+  /* BOTTOM-UP GENERATION.
+     1) A team tier is rolled; it only defines the QUALITY BAND that individual
+        players are drawn from (strong rolls higher, weak lower, mid narrower).
+     2) Every player is an independent random draw inside that band, with his
+        own personal attack/defence character skew.
+     3) The team's identity (attacker / defender / balanced) is DERIVED from
+        the squad that was actually produced — never imposed on it.
+     Anti-sticking rule: ceilings/floors clamp the CENTER before the draw;
+     the final value is a uniform +-5 roll around that center, so values
+     spread over an 11-point window instead of piling on a cap. */
+
+  const form=pick(Object.keys(FORMATIONS));
+
+  /* Team tier: overlapping bands, so a weak team's best units can out-rate a
+     strong team's worst units. Mid tier is deliberately narrower. */
+  const tierRoll=Math.random();
+  const band = tierRoll<0.25 ? {lo:73,hi:85}    /* strong */
+             : tierRoll<0.75 ? {lo:68,hi:78}    /* mid (narrow) */
+             :                 {lo:60,hi:74};   /* weak */
+
+  const labels=labelsFor(form);
+  const players=FORMATIONS[form].map((slot,i)=>{
+    if(slot[0]==='GK'){
+      const g=clamp(ri(band.lo,band.hi)+ri(0,5),60,88);
+      return {pos:labels[i],basePos:'GK',isGK:true,gk:g,
+        pace:1,shooting:1,passing:1,dribbling:1,defending:1,physic:1};
+    }
+    const m=POS_MODS[slot[0]]||{};
+    /* Player's own tier inside the team band (uniform -> real squad variety) */
+    const pq=ri(band.lo,band.hi);
+    /* Independent personal character: a player can be individually
+       attack-gifted or defence-gifted regardless of anyone else */
+    const aSkew=ri(-4,4), dSkew=ri(-4,4), pSkew=ri(-3,3);
+    /* Position mods amplified asymmetrically: defensive roles pull harder
+       down for attackers, up for defenders, keeping profiles believable. */
+    const mod=v=>(v||0)>=0 ? Math.round((v||0)*0.8) : Math.round((v||0)*1.25);
+    /* Attribute = uniform roll around a clamped center. Clamping the CENTER
+       (45..83) guarantees every draw lands in 40..88 without ever freezing
+       on a ceiling value. */
+    const attr=(raw,skew)=>{
+      const center=clamp(pq+mod(raw)+skew,45,83);
+      return ri(center-5,center+5);
+    };
+    return {pos:labels[i],basePos:slot[0],isGK:false,gk:0,
+      pace:    attr(m.pace,     pSkew),
+      shooting:attr(m.shooting, aSkew),
+      passing: attr(m.passing,  aSkew),
+      dribbling:attr(m.dribbling,aSkew),
+      defending:attr(m.defending,dSkew),
+      physic:  attr(m.physic,   dSkew)};
+  });
+
+  /* DERIVED IDENTITY: read off the produced squad, not decided beforehand */
+  const out=players.filter(p=>!p.isGK);
+  const atkAvg=Math.round(mean(out.map(p=>(p.shooting+p.passing+p.dribbling)/3)));
+  const defAvg=Math.round(mean(out.map(p=>(p.defending+p.physic)/2)));
+  const diff=atkAvg-defAvg;
+  const identity = diff>=3 ? 'attacker' : diff<=-3 ? 'defender' : 'balanced';
+
+  return {name:'',formation:form,players,identity};
+}
+const cloneTeam=t=>JSON.parse(JSON.stringify(t));
+
+/* ---------------- precompute ---------------- */
+function precompute(team){
+  const pc={count:{},avg:{},bonus:{},teamAvg:null,gk:team.players.find(p=>p.isGK).gk,penIdx:0};
+  const attrs=['pace','shooting','passing','dribbling','defending','physic'];
+  const all=team.players.filter(p=>!p.isGK);
+  pc.teamAvg={}; attrs.forEach(a=>pc.teamAvg[a]=mean(all.map(p=>p[a])));
+  /* penalty taker = outfield player with the HIGHEST SHOOTING */
+  let best=-1;
+  all.forEach(p=>{ const o=p.shooting; if(o>best){best=o; pc.penIdx=team.players.indexOf(p);} });
+  FORMATIONS[team.formation].forEach((slot,i)=>{
+    const p=team.players[i]; if(p.isGK) return;
+    const k=slot[1]+slot[2];
+    (pc.count[k]=pc.count[k]||0)+1;
+    (pc.avg[k]=pc.avg[k]||[]).push(p);
+  });
+  Object.keys(pc.count).forEach(k=>{
+    const list=pc.avg[k];
+    pc.avg[k]={}; attrs.forEach(a=>pc.avg[k][a]=mean(list.map(p=>p[a])));
+    pc.bonus[k]=Math.min((pc.count[k]-1)*CFG.bonusPerPlayer,CFG.bonusCap);
+  });
+  return pc;
+}
+function blend(avg,w){ let s=0; for(const k in w) s+=w[k]*(avg[k]||0); return s; }
+
+function zoneValue(team,key,role){
+  /* POOLED ZONE VALUE: ball's square contributes at full value; the two
+     touching support squares contribute at (average − emptyZonePenalty).
+     Numeric bonus: (ownExtra * bonusPerPlayer) + (supportPlayers * supportBonus). */
+  const pc=team.pc, d=+key[0];
+  const w=role==='A'?ATT_W[d]:DEF_W[d];
+  const nOwn=pc.count[key]||0;
+  let supSum=0, supN=0;
+  SUPPORT[key].forEach(s=>{
+    const n=pc.count[s]||0;
+    if(n>0){ supSum+=blend(pc.avg[s],w)*n; supN+=n; }
+  });
+  let base, bonus;
+  if(nOwn>0 && supN>0){
+    const ownV=blend(pc.avg[key],w);
+    const supV=(supSum/supN)-CFG.emptyZonePenalty;
+    base=(ownV*nOwn + supV*supN)/(nOwn+supN);
+    bonus=(nOwn-1)*CFG.bonusPerPlayer + supN*CFG.supportBonus;
+  } else if(nOwn>0){
+    base=blend(pc.avg[key],w);
+    bonus=(nOwn-1)*CFG.bonusPerPlayer;
+  } else if(supN>0){
+    base=(supSum/supN)-CFG.emptyZonePenalty;
+    bonus=supN*CFG.supportBonus;
+  } else {
+    base=blend(pc.teamAvg,w)-CFG.emptyZonePenalty;
+    bonus=0;
+  }
+  let v=base+Math.min(bonus,CFG.bonusCap);
+  if(role==='D'&&key==='1C') v=(1-CFG.gkBoxWeight)*v+CFG.gkBoxWeight*pc.gk;
+  return v;
+}
+function cornerAttack(team){
+  const pc=team.pc;
+  if(pc.count['3C']) return blend(pc.avg['3C'],CORNER_ATT_W)+pc.bonus['3C'];
+  return blend(pc.teamAvg,CORNER_ATT_W)-CFG.emptyZonePenalty;
+}
+function cornerDef(team){
+  const pc=team.pc;
+  let out=pc.count['1C']?blend(pc.avg['1C'],CORNER_DEF_W)+pc.bonus['1C']:blend(pc.teamAvg,CORNER_DEF_W);
+  return (1-CFG.gkCornerWeight)*out+CFG.gkCornerWeight*pc.gk;
+}
+
+/* ---------------- zone coordinate helpers ---------------- */
+const ownKey=(side,abs)=> side==='home' ? abs.col+abs.row : (4-abs.col)+flipL(abs.row);
+const absFromOwn=(side,d,l)=> side==='home' ? {col:d,row:l} : {col:4-d,row:flipL(l)};
+const fmtMin=m=> m<=90? String(m) : '90+'+(m-90);
+const zoneName=(d,l)=> (d===1?'own third':d===2?'midfield':'final third')+' '+(l==='L'?'left':l==='R'?'right':'center');
+
+/* ---------------- state ---------------- */
+let uiTeams={home:null,away:null};
+let snap=null;
+let state=null;
+let timer=null, speedMult=1;
+
+function freshStats(){
+  const s={};
+  ['home','away'].forEach(t=>s[t]={goals:0,shots:0,onTarget:0,offTarget:0,saves:0,corners:0,cornerGoals:0,
+    pens:0,penGoals:0,fouls:0,outs:0,turnovers:0,counters:0,possMin:0,zoneMin:{}});
+  return s;
+}
+function newState(){
+  return {minute:1,added:0,addedSet:false,poss:Math.random()<0.5?'home':'away',
+    firstKick:null,secondHalfKick:false,ballSpot:null,
+    abs:{col:2,row:'C'},score:{home:0,away:0},stats:freshStats(),pending:null,
+    started:false,running:false,finished:false};
+}
+state=newState();
+
+/* ---------------- logging ---------------- */
+const KEY_TYPES={goal:1,shot:1,corner:1,penalty:1};
+function log(m,text,type){
+  const el=document.getElementById('log');
+  const div=document.createElement('div');
+  div.className='line type-'+type+(KEY_TYPES[type]?' key':'');
+  div.innerHTML='<span class="min">'+fmtMin(m)+"'</span> "+text;
+  el.prepend(div);
+}
+
+/* ---------------- engine ---------------- */
+const dice=()=>ri(1,CFG.dice);
+const otherOf=t=>t==='home'?'away':'home';
+
+function kickoff(consTeam){
+  state.poss=consTeam;
+  state.abs=absFromOwn(consTeam,2,'C');
+}
+function goalScored(team,kind,m){
+  state.score[team]++;
+  const S=state.stats[team];
+  S.goals++; S.shots++; S.onTarget++;
+  if(kind==='corner') S.cornerGoals++;
+  if(kind==='penalty') S.penGoals++;
+  /* ball rests in the goal mouth for one event duration */
+  state.ballSpot = team==='home' ? {x:98.6,y:50} : {x:1.4,y:50};
+  log(m,'GOAL! '+uiTeams[team].name+'. ('+state.score.home+'-'+state.score.away+')', kind==='penalty'?'penalty':(kind==='corner'?'corner':'goal'));
+  document.getElementById('scorebar').classList.remove('pulse');
+  void document.getElementById('scorebar').offsetWidth;
+  document.getElementById('scorebar').classList.add('pulse');
+  const cell=document.querySelector('.cell.active');
+  if(cell){cell.classList.remove('flash'); void cell.offsetWidth; cell.classList.add('flash');}
+  /* STAGED KICK-OFF: the conceding team's restart from the centre square
+     happens as the NEXT event (own minute + own log line + ball move). */
+  state.pending={type:'kickoff',team:otherOf(team)};
+}
+function resolveCorner(m,taker){
+  const def=otherOf(taker);
+  const ha=homeAdvOn?CFG.homeAdvantage:0;
+  const Dc=(cornerAttack(snap[taker])+dice())-(cornerDef(snap[def])+dice())+(taker==='home'?ha:-ha);
+  if(Dc>=CFG.cornerGoalThr){ goalScored(taker,'corner',m); }
+  else if(Dc>=2){ state.poss=taker; state.abs=absFromOwn(taker,3,'C');
+    log(m,'Scramble from the corner, '+uiTeams[taker].name+' keep it in the box.','corner'); }
+  else if(Dc>=-13){ state.poss=def; state.abs=absFromOwn(def,2,'C');
+    log(m,'Corner cleared by '+uiTeams[def].name+'.','corner'); }
+  else { state.poss=def; state.abs=absFromOwn(def,3,'C'); state.stats[def].counters++;
+    log(m,uiTeams[def].name+' clear the corner and launch a COUNTER!','counter'); }
+}
+function resolvePenalty(m,taker){
+  const keeper=otherOf(taker);
+  const sho=snap[taker].players[snap[taker].pc.penIdx].shooting;
+  const ha=homeAdvOn?CFG.homeAdvantage:0;
+  const P=(sho+dice())-(snap[keeper].pc.gk+dice())+(taker==='home'?ha:-ha);
+  const S=state.stats[taker]; S.pens++; S.shots++; S.onTarget++;
+  if(P>=CFG.penGoalThr){ goalScored(taker,'penalty',m); }
+  else if(P>=0){ state.stats[keeper].saves++;
+    log(m,'Penalty parried by the keeper, '+uiTeams[taker].name+' keep it in the box.','penalty');
+    state.poss=taker; state.abs=absFromOwn(taker,3,'C'); }
+  else { state.stats[keeper].saves++;
+    log(m,'Penalty saved by the keeper!','penalty');
+    state.poss=keeper; state.abs=absFromOwn(keeper,2,'C'); }
+}
+function contest(m){
+  const poss=state.poss, def=otherOf(poss);
+  const abs=state.abs;
+  const ak=ownKey(poss,abs), dk=ownKey(def,abs);
+  const dAtt=+ak[0], lAtt=ak[1];
+  const atk=zoneValue(snap[poss],ak,'A');
+  const dfn=zoneValue(snap[def],dk,'D');
+  /* HOME ADVANTAGE: flat bonus on every duel roll for the home side
+     (plus when home attacks, minus for the attacker when home defends). */
+  const ha=homeAdvOn?CFG.homeAdvantage:0;
+  const D=(atk+dice())-(dfn+dice())+(poss==='home'?ha:-ha);
+  const isBoxC=(dAtt===3&&lAtt==='C'), isWide3=(dAtt===3&&lAtt!=='C');
+  state.stats[poss].possMin++;
+  state.stats[poss].zoneMin[abs.col+abs.row]=(state.stats[poss].zoneMin[abs.col+abs.row]||0)+1;
+
+  if(D>=CFG.breakThr){
+    if(isBoxC){ goalScored(poss,'open',m); }
+    else if(isWide3){
+      /* CORNER WON: ball parks on the corner flag of this square
+         (goal-line edge + touchline edge) until it is taken. */
+      state.pending={type:'corner',team:poss,side:lAtt};
+      state.stats[poss].corners++;
+      state.ballSpot={x: abs.col===3?98.8:1.2, y: abs.row==='L'?1.2:98.8};
+      log(m,'Corner to '+uiTeams[poss].name+' — to be taken from the '+(lAtt==='L'?'left':'right')+'.','corner');
+    }
+    else { state.abs=absFromOwn(poss,dAtt+1,lAtt);
+      log(m,uiTeams[poss].name+' break the pressure in '+zoneName(dAtt,lAtt)+', move forward.','other'); }
+  }
+  else if(D>=CFG.sideThr){
+    const nl = lAtt==='C' ? (Math.random()<0.5?'L':'R') : 'C';
+    state.abs=absFromOwn(poss,dAtt,nl);
+    log(m,uiTeams[poss].name+' switch the ball to the '+(nl==='L'?'left':nl==='R'?'right':'center')+' channel.','other');
+  }
+  else if(D>=CFG.foulThr){
+    state.stats[def].fouls++;
+    if(isBoxC&&Math.random()<CFG.boxFoulPenChance){
+      state.pending={type:'penalty',team:poss};
+      log(m,'Foul in the box — PENALTY to '+uiTeams[poss].name+'!','penalty');
+    } else {
+      state.pending={type:'free',team:poss,d:dAtt,l:lAtt};
+      log(m,'Foul by '+uiTeams[def].name+', free kick to '+uiTeams[poss].name+' in '+zoneName(dAtt,lAtt)+'.','foul');
+    }
+  }
+  else if(D>=CFG.outFloor){
+    /* -2..+1 band. THROW-IN ONLY FROM WING SQUARES (L/R). The ABSOLUTE square
+       (col,row) is stored in pending, so the take and the next duel happen in
+       exactly the square the ball left — independent of which team takes it.
+       Centre channel has no touchline: 0..+1 scramble, -1..-2 turnover. */
+    if(lAtt!=='C'){
+      state.stats[poss].outs++;
+      state.ballSpot={x:COLP[abs.col], y: abs.row==='L'?1.2:98.8};
+      state.pending={type:'throw',team:poss,col:abs.col,row:abs.row};
+      log(m,'Ball out of play — '+uiTeams[poss].name+' to take a throw-in in '+zoneName(dAtt,lAtt)+' ['+abs.col+','+abs.row+'].','other');
+    }
+    else if(D>=0){
+      log(m,'Scramble in '+zoneName(dAtt,lAtt)+', '+uiTeams[poss].name+' keep possession.','other');
+    }
+    else {
+      state.stats[poss].turnovers++;
+      log(m,uiTeams[poss].name+' lose the ball, '+uiTeams[def].name+' win it.','other');
+      state.poss=def;
+    }
+  }
+  else if(D>=CFG.turnoverFloor){
+    if(isBoxC){
+      state.stats[poss].shots++;
+      const ch=pick(['L','C','R']);
+      const chName=(ch==='L'?'left':ch==='R'?'right':'center');
+      if(D>=CFG.shotOnMin){
+        state.stats[poss].onTarget++; state.stats[def].saves++;
+        log(m,'Shot on target by '+uiTeams[poss].name+' — saved by the keeper; '+uiTeams[def].name+' carry it out to midfield '+chName+'.','shot');
+      } else {
+        /* GOAL KICK: ball parks beside the goal (just left/right of the
+           goal mouth on the goal line) of the goal that was attacked. */
+        state.stats[poss].offTarget++;
+        const dy = Math.random()<0.5 ? -13 : 13;
+        state.ballSpot = poss==='home' ? {x:96.5,y:50+dy} : {x:3.5,y:50+dy};
+        log(m,uiTeams[poss].name+' shot off target, goal kick; '+uiTeams[def].name+' carry it out to midfield '+chName+'.','shot');
+      }
+      state.poss=def;
+      state.abs=absFromOwn(def,2,ch);
+    } else {
+      state.stats[poss].turnovers++;
+      log(m,uiTeams[poss].name+' lose the ball, '+uiTeams[def].name+' win it.','other');
+      state.poss=def;
+    }
+  }
+  else {
+    state.stats[def].counters++;
+    log(m,uiTeams[def].name+' win the ball and launch a COUNTER!','counter');
+    state.poss=def;
+    state.abs=absFromOwn(def, Math.min(+dk[0]+1,3), dk[1]);
+  }
+}
+function step(){
+  if(!state.running) return;
+  state.ballSpot=null;   /* new minute: ball returns to its square centre */
+  const m=state.minute;
+  let consumedThrow=false;
+  if(state.pending){
+    const pd=state.pending;
+    state.pending=null;
+    if(pd.type==='corner'){
+      state.abs=absFromOwn(pd.team,3,'C');
+      log(m,uiTeams[pd.team].name+' take the corner from the '+(pd.side==='L'?'left':'right')+' — ball delivered into the box.','corner');
+      state.pending={type:'cornerResolve',team:pd.team};
+    }
+    else if(pd.type==='cornerResolve'){
+      resolveCorner(m,pd.team);
+    }
+    else if(pd.type==='free'){
+      const nd=Math.min(pd.d+1,3);
+      state.abs=absFromOwn(pd.team,nd,pd.l);
+      log(m,uiTeams[pd.team].name+' take the free kick — ball into '+zoneName(nd,pd.l)+'.','foul');
+    }
+    else if(pd.type==='throw'){
+      /* THROW-IN TAKEN: always in the EXACT absolute square where the ball
+         went out, no matter which team takes it. Re-assert the square so no
+         perspective math can ever move it. */
+      consumedThrow=true;
+      state.abs={col:pd.col,row:pd.row};
+      const ok=ownKey(pd.team,state.abs);
+      log(m,uiTeams[pd.team].name+' take the throw-in in '+zoneName(+ok[0],ok[1])+' ['+pd.col+','+pd.row+'].','other');
+    }
+    else if(pd.type==='kickoff'){
+      kickoff(pd.team);
+      log(m,'Kick-off: '+uiTeams[pd.team].name+' restart from the centre.','other');
+    }
+    else {
+      resolvePenalty(m,pd.team);
+    }
+  }
+  else if(state.secondHalfKick){
+    state.secondHalfKick=false;
+    state.poss=otherOf(state.firstKick);
+    state.abs={col:2,row:'C'};
+    log(m,'Second half — '+uiTeams[state.poss].name+' kick off.','other');
+    contest(m);
+  }
+  else contest(m);
+
+  if(m===45){
+    log(45,'Half-time.','other');
+    /* do not stomp the throw-in square if the take just happened on minute 45 */
+    if(!consumedThrow){ state.abs={col:2,row:'C'}; state.ballSpot=null; }
+    state.secondHalfKick=true;
+  }
+  if(m===90&&!state.addedSet){ state.added=ri(3,8); state.addedSet=true;
+    log(90,'+'+state.added+' added time.','other'); }
+  if(m===90+state.added){
+    state.finished=true; state.running=false; clearInterval(timer);
+    log(m,'Full-time. '+uiTeams.home.name+' '+state.score.home+'-'+state.score.away+' '+uiTeams.away.name+'.','other');
+  }
+  state.minute=m+1;
+  render();
+}
+
+/* ---------------- match control ---------------- */
+function initMatch(){
+  /* COMMIT STAGE: panel parameters, squad edits and the home-advantage
+     switch become active ONLY here (new match after Cancel or full-time). */
+  CFG=Object.assign({},pendingCfg);
+  homeAdvOn=pendingHomeAdv;
+  readTeamFromUI('home'); readTeamFromUI('away');
+  snap={home:cloneTeam(uiTeams.home),away:cloneTeam(uiTeams.away)};
+  snap.home.pc=precompute(snap.home); snap.away.pc=precompute(snap.away);
+  state=newState(); state.started=true; state.running=true;
+  state.firstKick=state.poss;
+  document.getElementById('log').innerHTML='';
+  log(1,'Kick-off: '+uiTeams[state.poss].name+' start with the ball.','other');
+  restartTimer(); render();
+}
+function restartTimer(){ clearInterval(timer); if(state.running) timer=setInterval(step,4000/speedMult); }
+function startBtn(){
+  if(state.finished||!state.started){ initMatch(); }
+  else { state.running=true; restartTimer(); }
+  render();
+}
+function pauseBtn(){ state.running=false; clearInterval(timer); render(); }
+function setSpeed(m){ speedMult=m;
+  document.getElementById('btnS1').classList.toggle('active',m===1);
+  document.getElementById('btnS2').classList.toggle('active',m===2);
+  document.getElementById('btnS4').classList.toggle('active',m===4);
+  document.getElementById('btnS8').classList.toggle('active',m===8);
+  restartTimer();
+}
+function cancelBtn(){
+  clearInterval(timer);
+  state=newState();
+  document.getElementById('log').innerHTML='';
+  render();
+}
+
+/* ---------------- UI: team panels ---------------- */
+function buildPanel(side){
+  const panel=document.getElementById(side==='home'?'panelHome':'panelAway');
+  panel.innerHTML=
+    '<h3>'+(side==='home'?'HOME':'AWAY')+'</h3>'+
+    '<div class="rowline"><input type="text" id="name_'+side+'" value="'+(side==='home'?'Home Team':'Away Team')+'">'+
+    '<button id="new_'+side+'">New Team</button></div>'+
+    '<div class="rowline"><select id="form_'+side+'">'+Object.keys(FORMATIONS).map(f=>'<option>'+f+'</option>').join('')+'</select></div>'+
+    '<table class="pt"><thead><tr><th>POS</th><th>PACE</th><th>SHO</th><th>PAS</th><th>DRI</th><th>DEF</th><th>PHY</th></tr></thead>'+
+    '<tbody id="rows_'+side+'"></tbody></table>'+
+    '<div class="infoline" id="info_'+side+'"></div>';
+  document.getElementById('name_'+side).addEventListener('input',e=>{
+    uiTeams[side].name=e.target.value;
+    document.getElementById(side==='home'?'sbHome':'sbAway').textContent=e.target.value;
+    updateInfo(side);
+  });
+  document.getElementById('new_'+side).addEventListener('click',()=>{
+    const nm=uiTeams[side].name;
+    uiTeams[side]=makeRandomTeam(); uiTeams[side].name=nm;
+    writeTeamToUI(side); updateInfo(side); renderPitch();
+  });
+  document.getElementById('form_'+side).addEventListener('change',e=>{
+    readTeamFromUI(side);
+    uiTeams[side].formation=e.target.value;
+    const labels=labelsFor(e.target.value);
+    uiTeams[side].players.forEach((p,i)=>{p.pos=labels[i]; p.basePos=FORMATIONS[e.target.value][i][0];});
+    writeTeamToUI(side); updateInfo(side); renderPitch();
+  });
+  /* LIVE squad edits: values land in uiTeams + info line immediately, but a
+     RUNNING match keeps using its snapshot; edits commit on next initMatch. */
+  document.getElementById('rows_'+side).addEventListener('change',()=>{
+    readTeamFromUI(side); updateInfo(side);
+  });
+}
+function writeTeamToUI(side){
+  const t=uiTeams[side];
+  document.getElementById('form_'+side).value=t.formation;
+  const tb=document.getElementById('rows_'+side);
+  tb.innerHTML='';
+  t.players.forEach((p,i)=>{
+    const tr=document.createElement('tr');
+    if(p.isGK){
+      tr.innerHTML='<td class="poscell">GK</td><td colspan="6"><input type="number" min="40" max="99" data-i="'+i+'" data-f="gk" value="'+p.gk+'" style="width:70px"> &nbsp;OVR (goalkeeping)</td>';
+    } else {
+      tr.innerHTML='<td class="poscell">'+p.pos+'</td>'+
+        ['pace','shooting','passing','dribbling','defending','physic'].map(f=>
+          '<td><input type="number" min="1" max="99" data-i="'+i+'" data-f="'+f+'" value="'+p[f]+'"></td>').join('');
+    }
+    tb.appendChild(tr);
+  });
+}
+function readTeamFromUI(side){
+  const t=uiTeams[side];
+  document.querySelectorAll('#rows_'+side+' input').forEach(inp=>{
+    const i=+inp.dataset.i, f=inp.dataset.f, v=parseInt(inp.value,10);
+    if(f==='gk') t.players[i].gk=clamp(isNaN(v)?70:v,40,99);
+    else t.players[i][f]=clamp(isNaN(v)?50:v,1,99);
+  });
+}
+function updateInfo(side){
+  const t=cloneTeam(uiTeams[side]); t.pc=precompute(t);
+  const pk=t.players[t.pc.penIdx];
+  /* team-level averages so the identity is visible at a glance */
+  const outfield=t.players.filter(p=>!p.isGK);
+  const atkAvg=Math.round(mean(outfield.map(p=>(p.shooting+p.passing+p.dribbling)/3)));
+  const defAvg=Math.round(mean(outfield.map(p=>(p.defending+p.physic)/2)));
+  const idLabel={balanced:'balanced',attacker:'attack-strong',defender:'defence-strong'}[t.identity]||'—';
+  document.getElementById('info_'+side).innerHTML=
+    '<b>Identity:</b> '+idLabel+'<br>'+
+    '<b>Attack avg:</b> '+atkAvg+' &nbsp; <b>Defence avg:</b> '+defAvg+
+    ' &nbsp;(Δ '+(atkAvg-defAvg>0?'+':'')+(atkAvg-defAvg)+')<br>'+
+    'Penalty taker: '+pk.pos+' (SHO '+pk.shooting+')<br>GK: '+t.pc.gk;
+}
+
+/* ---------------- UI: pitch ---------------- */
+const COLP={1:16.667,2:50,3:83.333}, ROWP={L:16.667,C:50,R:83.333};
+function buildPitch(){
+  const p=document.getElementById('pitch'); p.innerHTML='';
+  /* LANDSCAPE orientation:
+     grid columns = depth  (col 1 = HOME own third / home goal LEFT,
+                            col 3 = HOME final third / AWAY goal RIGHT)
+     grid rows    = lateral (top row = L, middle = C, bottom = R, home perspective)
+     Grid auto-flow is ROW-major, so we must add cells lateral-first. */
+  for(const r of ['L','C','R']){
+    for(let c=1;c<=3;c++){
+      const cell=document.createElement('div');
+      cell.className='cell'; cell.id='cell-'+c+r;
+      cell.innerHTML='<div class="zlabel">('+c+','+r+')</div><div class="sqrow home"></div><div class="sqrow away"></div>';
+      p.appendChild(cell);
+    }
+  }
+  /* goals: home goal on the LEFT edge, away goal on the RIGHT edge */
+  const g1=document.createElement('div'); g1.className='goaldec'; g1.style.left='0px'; p.appendChild(g1);
+  const g2=document.createElement('div'); g2.className='goaldec'; g2.style.right='0px'; p.appendChild(g2);
+}
+function renderPitch(){
+  const src=state.started?snap:uiTeams;
+  document.querySelectorAll('.cell .sqrow').forEach(e=>e.innerHTML='');
+  document.querySelectorAll('#pitch > .sq.gk').forEach(e=>e.remove());
+  ['home','away'].forEach(side=>{
+    const t=src[side]; if(!t) return;
+    FORMATIONS[t.formation].forEach((slot,i)=>{
+      const p=t.players[i];
+      const d=document.createElement('div');
+      if(p.isGK){
+        d.className='sq gk '+side; d.textContent='GK';
+        document.getElementById('pitch').appendChild(d);
+        return;
+      }
+      const abs=absFromOwn(side,slot[1],slot[2]);
+      const row=document.querySelector('#cell-'+abs.col+abs.row+' .sqrow.'+side);
+      d.className='sq '+side; d.textContent=p.pos;
+      row.appendChild(d);
+    });
+  });
+  const b=document.getElementById('ball');
+  if(state.ballSpot){ b.style.left=state.ballSpot.x+'%'; b.style.top=state.ballSpot.y+'%'; }
+  else { b.style.left=COLP[state.abs.col]+'%'; b.style.top=ROWP[state.abs.row]+'%'; }
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('active'));
+  const ac=document.getElementById('cell-'+state.abs.col+state.abs.row);
+  if(ac) ac.classList.add('active');
+}
+
+/* ---------------- UI: stats & heat ---------------- */
+const STAT_ROWS=[['Goals','goals'],['Shots','shots'],['On target','onTarget'],['Off target','offTarget'],
+  ['Saves','saves'],['Corners','corners'],['Corner goals','cornerGoals'],['Penalties (G/T)','pens'],
+  ['Fouls','fouls'],['Outs','outs'],['Turnovers','turnovers'],['Counters','counters']];
+function renderStats(){
+  const tot=state.stats.home.possMin+state.stats.away.possMin;
+  const ph=tot?Math.round(100*state.stats.home.possMin/tot):0;
+  const pa=tot?100-ph:0;
+  let html='';
+  STAT_ROWS.forEach(r=>{
+    let hv=state.stats.home[r[1]], av=state.stats[away=r[1]==='pens'?'home':r[1]==='pens'?'away':'home']!==undefined?state.stats.home[r[1]]:0;
+    /* (satır itibarıyla basit tut: pens özel biçimi aşağıda) */
+    hv=state.stats.home[r[1]]; av=state.stats.away[r[1]];
+    if(r[1]==='pens'){ hv=state.stats.home.penGoals+'/'+hv; av=state.stats.away.penGoals+'/'+av; }
+    html+='<tr><td class="v">'+hv+'</td><td class="l">'+r[0]+'</td><td class="v">'+av+'</td></tr>';
+  });
+  html+='<tr><td class="v">'+ph+'%</td><td class="l">Possession</td><td class="v">'+pa+'%</td></tr>';
+  document.getElementById('stTable').innerHTML=html;
+
+  /* HEAT MAP: 2x size, ratio-based colour scale (share of team possession
+     minutes), black bold numbers on top of the coloured cell, white borders
+     and white team titles. */
+  const hb=document.getElementById('heatbox');
+  hb.innerHTML=['home','away'].map(side=>{
+    const zm=state.stats[side].zoneMin;
+    let total=0; for(const k in zm) total+=zm[k];
+    const colorFor=v=>{
+      if(total<=0) return '#2ea043';
+      const s=v/total;
+      if(s>=0.18) return '#e5484d';  /* red    : hottest square   */
+      if(s>=0.13) return '#f0883e';  /* orange : heavy            */
+      if(s>=0.09) return '#ffd83d';  /* yellow : around average   */
+      return '#2ea043';              /* green  : rarely used      */
+    };
+    let cells='';
+    for(let c=1;c<=3;c++){ cells+='<tr>';
+      for(const r of ['L','C','R']){
+        const v=zm[c+r]||0;
+        cells+='<td style="background:'+colorFor(v)+'">'+v+'</td>';
+      }
+      cells+='</tr>'; }
+    return '<div class="heat">'+uiTeams[side].name+' (min/zone)<table>'+cells+'</table></div>';
+  }).join('');
+}
+function render(){
+  document.getElementById('scHome').textContent=state.score.home;
+  document.getElementById('scAway').textContent=state.score.away;
+  document.getElementById('clockMin').textContent= state.minute<=90? ('MIN '+state.minute) : ('MIN 90+'+(state.minute-90));
+  document.getElementById('clockHalf').textContent= state.finished?'full-time':(state.minute<=45?'first half':(state.minute<=90?'second half':'added time'));
+  document.getElementById('btnStart').disabled=state.running;
+  document.getElementById('btnPause').disabled=!state.running;
+  renderPitch(); renderStats();
+}
+
+/* ---------------- UI: advanced config ---------------- */
+function buildAdv(){
+  const g=document.getElementById('advgrid');
+  g.innerHTML=ADV_FIELDS.map(f=>'<label>'+f[1]+'<input type="number" id="cfg_'+f[0]+'" step="any" value="'+pendingCfg[f[0]]+'"></label>').join('');
+  ADV_FIELDS.forEach(f=>{
+    document.getElementById('cfg_'+f[0]).addEventListener('change',e=>{
+      let v=parseFloat(e.target.value); if(isNaN(v)) v=DEFAULT_CFG[f[0]];
+      v=clamp(v,f[2],f[3]); pendingCfg[f[0]]=v; e.target.value=v;  /* staged; commits at next match start */
+    });
+  });
+  document.getElementById('btnCfgReset').addEventListener('click',()=>{
+    pendingCfg=Object.assign({},DEFAULT_CFG);
+    ADV_FIELDS.forEach(f=>document.getElementById('cfg_'+f[0]).value=pendingCfg[f[0]]);
+  });
+}
+
+/* ---------------- init ---------------- */
+function init(){
+  uiTeams.home=makeRandomTeam(); uiTeams.home.name='Home Team';
+  uiTeams.away=makeRandomTeam(); uiTeams.away.name='Away Team';
+  buildPanel('home'); buildPanel('away');
+  writeTeamToUI('home'); writeTeamToUI('away');
+  updateInfo('home'); updateInfo('away');
+  buildPitch(); buildAdv();
+  document.getElementById('btnStart').addEventListener('click',startBtn);
+  document.getElementById('btnPause').addEventListener('click',pauseBtn);
+  document.getElementById('btnS1').addEventListener('click',()=>setSpeed(1));
+  document.getElementById('btnS2').addEventListener('click',()=>setSpeed(2));
+  document.getElementById('btnS4').addEventListener('click',()=>setSpeed(4));
+  document.getElementById('btnS8').addEventListener('click',()=>setSpeed(8));
+  document.getElementById('btnCancel').addEventListener('click',cancelBtn);
+  document.getElementById('optZL').addEventListener('change',e=>document.getElementById('pitch').classList.toggle('hidezl',!e.target.checked));
+  document.getElementById('optCompact').addEventListener('change',e=>document.getElementById('log').classList.toggle('compact',e.target.checked));
+  document.getElementById('optHeat').addEventListener('change',e=>document.getElementById('heatbox').classList.toggle('show',e.target.checked));
+  document.getElementById('optHide').addEventListener('change',e=>{
+    document.getElementById('pitchwrap').classList.toggle('hidden',e.target.checked);
+  });
+  /* Home advantage switch: staged only; committed at next initMatch so a
+     running match is never affected mid-game. */
+  document.getElementById('optHomeAdv').addEventListener('change',e=>{ pendingHomeAdv=e.target.checked; });
+  render();
+}
+init();
+</script>
+</body>
+</html>
