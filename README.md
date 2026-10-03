@@ -139,6 +139,12 @@ A good calibration target on 100 simulated matches at Speed x8:
 - Edit squads **before** pressing Start. Changes mid-match are ignored by design — they take effect on the next kick-off.
 - Press **New Team** on one side to regenerate just that squad; the other side is preserved for a rematch.
 
+- #### v1.3 — Squad files & formation prune
+- Added **JSON import / export** for both squads (team names, formations, identities, all six outfield attributes + goalkeeper rating). Mid-match imports/exports pause the match and require confirmation; the match is cancelled only on "Yes".
+- Formation set pruned from 16 to **12**: removed 4-2-3-1, 4-1-2-2-1, 4-4-1-1, 4-1-3-2, 4-5-1 and 4-1-2-1-2 (each collapsed to an identical 9-zone footprint of a kept shape); added **4-2-4**; reworked **3-4-2-1** into a centre-overload shape (four players in midfield centre, lone striker); **SS** moved into the 4-3-2-1 tree.
+- Old squad files remain loadable: removed formation codes are migrated to their closest current shape (4-2-3-1→4-2-4, 4-1-2-1-2→4-3-2-1, 4-1-2-2-1→4-3-3, 4-4-1-1 / 4-1-3-2→4-4-2, 4-5-1→4-1-4-1).
+- **Live formation changes** — a formation switch made while a match is running re-slots the snapshot squad and rebuilds the zone pools on the spot, so the new shape is visible on the pitch and active in every duel from the next minute, while player-value edits still commit only at the next kick-off.
+
 ### License & contributing
 
 MIT — use it, fork it, embed it, ship it, modify it. Pull requests are welcome for any of the roadmap items above or for bug fixes. Please open an issue first for large redesigns so we can align on scope.
